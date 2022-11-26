@@ -36,3 +36,13 @@ class Schedule(BaseModel):
 
     async def delete(self):
         await models.orm.Schedule.filter(id=self.id).delete()
+
+    @classmethod
+    async def get_invalid(cls):
+        schedules = await models.orm.Schedule.all()
+        for i in schedules:
+            if datetime.datetime.strptime(i.time, "%Y-%m-%d %H:%M") > datetime.datetime.now():
+                schedules.remove(i)
+
+        schedules.sort(key=lambda x: datetime.datetime.strptime(x.time, "%Y-%m-%d %H:%M"))
+        return schedules
