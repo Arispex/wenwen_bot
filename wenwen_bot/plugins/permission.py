@@ -33,6 +33,8 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
         with open("admins.json", "w") as fp:
             json.dump(admins, fp)
 
+        logger.info(f"「{event.user_id} 」添加了管理员「{user_id}」")
+        logger.info("管理员列表已更新")
         await add_admin.finish(f"添加成功！")
     else:
         await add_admin.finish(f"无效的语法！\n正确的语法：/添加管理员 <QQ号>")
@@ -53,6 +55,9 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
             admins.remove(user_id)
             with open("admins.json", "w") as fp:
                 json.dump(admins, fp)
+
+            logger.info(f"「{event.user_id} 」删除了管理员「{user_id}」")
+            logger.info("管理员列表已更新")
             await remove_admin.finish(f"删除成功！")
         else:
             await remove_admin.finish(f"该用户不是管理员！")
