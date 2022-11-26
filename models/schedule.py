@@ -33,3 +33,6 @@ class Schedule(BaseModel):
 
         schedules.sort(key=lambda x: datetime.datetime.strptime(x.time, "%Y-%m-%d %H:%M"))
         return schedules
+
+    async def delete(self):
+        await models.orm.Schedule.filter(id=self.id).delete()
