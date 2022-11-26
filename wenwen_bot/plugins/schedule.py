@@ -15,6 +15,8 @@ add_schedule = on_command("添加日程", permission=SUPERUSER | models.permissi
 
 remove_schedule = on_command("删除日程", permission=SUPERUSER | models.permission.ADMIN)
 
+check_schedule = on_command("查看日程")
+
 
 @add_schedule.handle()
 async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
@@ -80,3 +82,23 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
                 await remove_schedule.finish("删除成功！")
         else:
             await remove_schedule.finish("无效的语法！\n正确的语法：/删除日程 <日程ID>")
+
+
+@check_schedule.handle()
+async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
+    if event.group_id in config.groups:
+        schedule_id = int(args.extract_plain_text())
+        if schedule_id:
+            schedules = await models.Schedule.get_valid()
+            try:
+                schedule = schedules[schedule_id - 1]
+            except IndexError:
+                await check_schedule.finish("日程不存在！")
+
+            await check_schedule.finish(
+                f"{schedule.name}\n"
+                f"截止时间：{schedule.time}\n"
+                f"具体内容：{schedule.content}"
+            )
+        else:
+            await check_schedule.finish("无效的语法！\n正确的语法：/查看日程 <日程ID>")
