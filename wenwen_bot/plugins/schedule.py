@@ -1,4 +1,4 @@
-from nonebot import on_command
+from nonebot import on_command, get_bot
 from nonebot.log import logger
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
@@ -10,6 +10,10 @@ from nonebot.adapters.onebot.v11 import (
 import config
 import models
 import datetime
+from nonebot import require
+from nonebot_plugin_apscheduler import scheduler
+
+require("nonebot_plugin_apscheduler")
 
 add_schedule = on_command("添加日程", permission=SUPERUSER | models.permission.ADMIN)
 
@@ -97,6 +101,7 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
             except IndexError:
                 await check_schedule.finish("日程不存在！")
 
+            logger.info(f"「{event.get_user_id()}」查看了一个日程「{schedule.name}」")
             await check_schedule.finish(
                 f"{schedule.name}\n"
                 f"截止时间：{schedule.time}\n"
@@ -108,12 +113,103 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
 
 @check_invalid_schedules.handle()
 async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
-    schedules = await models.Schedule.get_invalid()
-    message = []
+    if event.group_id in config.groups:
+        schedules = await models.Schedule.get_invalid()
+        message = []
+        num = 1
+        for i in schedules:
+            message.append(
+                f"「{num}」 {i.time} {i.name}"
+            )
+            num += 1
+        logger.info(f"「{event.get_user_id()}」查看了失效日程")
+        await check_invalid_schedules.finish("已过期事项：\n" + "\n".join(message))
+
+
+async def send_valid_schedule():
+    bot = get_bot()
+    schedules = await models.Schedule.get_valid()
+    msg = []
     num = 1
     for i in schedules:
-        message.append(
+        msg.append(
             f"「{num}」 {i.time} {i.name}"
         )
         num += 1
-    await check_invalid_schedules.finish("已过期事项：\n" + "\n".join(message))
+    logger.info("22点定时任务执行成功！")
+    for i in config.groups:
+        await bot.send_group_msg(group_id=i, message="待完成事项：\n" + "\n".join(msg))
+
+
+scheduler.add_job(send_valid_schedule, "cron", hour=22, minute=0, second=0)
+
+
+async def check_schedule_time():
+    # 获取所有日程，分别检测现在是否是每个日程提前12小时和2小时的时间，如果是再判断现在是否处于22点到7点之内
+    # 如果不是，就发生提醒
+    bot = get_bot()
+    schedules = await models.Schedule.get_valid()
+    for i in schedules:
+        time_obj = datetime.datetime.strptime(i.time, "%Y-%m-%d %H:%M")
+        if (datetime.datetime.now() + datetime.timedelta(hours=12)).replace(second=0, microsecond=0) == time_obj:
+            if 23 <= datetime.datetime.now().hour or datetime.datetime.now().hour <= 7:
+                logger.info("检测到日程「{i.name}」还有12小时就要到期了，但是现在是23点到7点之间，不发送提醒")
+            else:
+                for j in config.groups:
+                    logger.info(f"检测到日程「{i.name}」还有12小时就要到期了，发送提醒")
+                    await bot.send_group_msg(group_id=j, message=f"日程「{i.name}」还有十二个小时就将结束，请检查自己是否完成该日程。")
+        elif (datetime.datetime.now() + datetime.timedelta(hours=2)).replace(second=0, microsecond=0) == time_obj:
+            if 23 <= datetime.datetime.now().hour or datetime.datetime.now().hour <= 7:
+                logger.info("检测到日程「{i.name}」还有2小时就要到期了，但是现在是23点到7点之间，不发送提醒")
+            else:
+                for j in config.groups:
+                    logger.info(f"检测到日程「{i.name}」还有2小时就要到期了，发送提醒")
+                    await bot.send_group_msg(group_id=j, message=f"日程「{i.name}」还有两个小时就将结束，请检查自己是否完成该日程。")
+
+
+scheduler.add_job(check_schedule_time, "cron", minute="*/1", second=0)
+
+
+async def morning_check():
+    # 检查每个日程提前12小时和2小时的时间是否处于22点到7点之间，如果是，就发生提醒
+    bot = get_bot()
+    schedules = await models.Schedule.get_valid()
+    for i in schedules:
+        time_obj = datetime.datetime.strptime(i.time, "%Y-%m-%d %H:%M")
+        if (time_obj - datetime.timedelta(hours=12)).hour > 22:
+            for j in config.groups:
+                if time_obj.minute == 0:
+                    min = ""
+                else:
+                    min = f"{time_obj.minute}分"
+                await bot.send_group_msg(group_id=j,
+                                         message=f"日程「{i.name}」将于明早{time_obj.hour}点{min}结束，请检查自己是否完成该日程。")
+        elif (time_obj - datetime.timedelta(hours=12)).hour < 7:
+            for j in config.groups:
+                if time_obj.minute == 0:
+                    min = ""
+                else:
+                    min = f"{time_obj.minute}分"
+                await bot.send_group_msg(group_id=j,
+                                         message=f"日程「{i.name}」将于明早{time_obj.hour}点{min}结束，请检查自己是否完成该日程。")
+
+        if (time_obj - datetime.timedelta(hours=2)).hour < 7:
+            for j in config.groups:
+                if time_obj.minute == 0:
+                    min = ""
+                else:
+                    min = f"{time_obj.minute}分"
+                await bot.send_group_msg(group_id=j,
+                                         message=f"日程「{i.name}」将于明早{time_obj.hour}点{min}结束，请检查自己是否完成该日程。")
+
+        elif (time_obj - datetime.timedelta(hours=2)).hour < 7:
+            for j in config.groups:
+                if time_obj.minute == 0:
+                    min = ""
+                else:
+                    min = f"{time_obj.minute}分"
+                await bot.send_group_msg(group_id=j,
+                                         message=f"日程「{i.name}」将于明早{time_obj.hour}点{min}结束，请检查自己是否完成该日程。")
+
+
+scheduler.add_job(morning_check, "cron", hour=23, minute=0, second=0)
