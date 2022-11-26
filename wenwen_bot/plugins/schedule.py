@@ -17,6 +17,8 @@ remove_schedule = on_command("删除日程", permission=SUPERUSER | models.permi
 
 check_schedule = on_command("查看日程")
 
+check_invalid_schedules = on_command("失效日程")
+
 
 @add_schedule.handle()
 async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
@@ -102,3 +104,16 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
             )
         else:
             await check_schedule.finish("无效的语法！\n正确的语法：/查看日程 <日程ID>")
+
+
+@check_invalid_schedules.handle()
+async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
+    schedules = await models.Schedule.get_invalid()
+    message = []
+    num = 1
+    for i in schedules:
+        message.append(
+            f"「{num}」 {i.time} {i.name}"
+        )
+        num += 1
+    await check_invalid_schedules.finish("已过期事项：\n" + "\n".join(message))
