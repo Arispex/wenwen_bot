@@ -27,10 +27,12 @@ class Schedule(BaseModel):
     @classmethod
     async def get_valid(cls):
         schedules = await models.orm.Schedule.all()
+        delete_schedule = []
         for i in schedules:
             if datetime.datetime.strptime(i.time, "%Y-%m-%d %H:%M") < datetime.datetime.now():
-                schedules.remove(i)
-
+                delete_schedule.append(i)
+        for i in delete_schedule:
+            schedules.remove(i)
         schedules.sort(key=lambda x: datetime.datetime.strptime(x.time, "%Y-%m-%d %H:%M"))
         return schedules
 
@@ -40,9 +42,20 @@ class Schedule(BaseModel):
     @classmethod
     async def get_invalid(cls):
         schedules = await models.orm.Schedule.all()
+        delete_schedule = []
         for i in schedules:
             if datetime.datetime.strptime(i.time, "%Y-%m-%d %H:%M") > datetime.datetime.now():
-                schedules.remove(i)
+                # 判断超过24小时
+                delete_schedule.append(i)
+        for i in delete_schedule:
+            schedules.remove(i)
 
-        schedules.sort(key=lambda x: datetime.datetime.strptime(x.time, "%Y-%m-%d %H:%M"))
+        delete_schedule = []
+        for i in schedules:
+            if (datetime.datetime.now() - datetime.datetime.strptime(i.time, "%Y-%m-%d %H:%M")) > datetime.timedelta(
+                    hours=24):
+                delete_schedule.append(i)
+        for i in delete_schedule:
+            schedules.remove(i)
+        schedules.sort(key=lambda x: datetime.datetime.strptime(x.time, "%Y-%m-%d %H:%M"), reverse=True)
         return schedules
