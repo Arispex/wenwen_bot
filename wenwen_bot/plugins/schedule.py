@@ -93,8 +93,9 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
 @check_schedule.handle()
 async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     if event.group_id in config.groups:
-        schedule_id = int(args.extract_plain_text())
+        schedule_id = args.extract_plain_text()
         if schedule_id:
+            schedule_id = int(schedule_id)
             schedules = await models.Schedule.get_valid()
             try:
                 schedule = schedules[schedule_id - 1]
@@ -108,7 +109,14 @@ async def _(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
                 f"具体内容：{schedule.content}"
             )
         else:
-            await check_schedule.finish("无效的语法！\n正确的语法：/查看日程 <日程ID>")
+            schedules = await models.Schedule.get_valid()
+            message = []
+            schedule_id = 1
+            for i in schedules:
+                message.append(f"「{schedule_id}」 {i.name} {i.time}")
+                schedule_id += 1
+
+            await check_schedule.finish("待完成事项：\n" + "\n".join(message))
 
 
 @check_invalid_schedules.handle()
@@ -153,14 +161,26 @@ async def check_schedule_time():
         time_obj = datetime.datetime.strptime(i.time, "%Y-%m-%d %H:%M")
         if (datetime.datetime.now() + datetime.timedelta(hours=12)).replace(second=0, microsecond=0) == time_obj:
             if 23 <= datetime.datetime.now().hour or datetime.datetime.now().hour <= 7:
-                logger.info("检测到日程「{i.name}」还有12小时就要到期了，但是现在是23点到7点之间，不发送提醒")
+                if (datetime.datetime.now() == 23 and datetime.datetime.now().minute == 0) or (datetime.datetime.now().hour == 6 and datetime.datetime.now().minute == 59):
+                    for j in config.groups:
+                        logger.info(f"检测到日程「{i.name}」还有12小时就要到期了，发送提醒")
+                        await bot.send_group_msg(group_id=j,
+                                                 message=f"日程「{i.name}」还有十二个小时就将结束，请检查自己是否完成该日程。")
+                else:
+                    logger.info(f"检测到日程「{i.name}」还有12小时就要到期了，但是现在是23点到7点之间，不发送提醒")
             else:
                 for j in config.groups:
                     logger.info(f"检测到日程「{i.name}」还有12小时就要到期了，发送提醒")
                     await bot.send_group_msg(group_id=j, message=f"日程「{i.name}」还有十二个小时就将结束，请检查自己是否完成该日程。")
         elif (datetime.datetime.now() + datetime.timedelta(hours=2)).replace(second=0, microsecond=0) == time_obj:
             if 23 <= datetime.datetime.now().hour or datetime.datetime.now().hour <= 7:
-                logger.info("检测到日程「{i.name}」还有2小时就要到期了，但是现在是23点到7点之间，不发送提醒")
+                if (datetime.datetime.now() == 23 and datetime.datetime.now().minute == 0) or (datetime.datetime.now().hour == 6 and datetime.datetime.now().minute == 59):
+                    for j in config.groups:
+                        logger.info(f"检测到日程「{i.name}」还有2小时就要到期了，发送提醒")
+                        await bot.send_group_msg(group_id=j,
+                                                 message=f"日程「{i.name}」还有两个小时就将结束，请检查自己是否完成该日程。")
+                else:
+                    logger.info(f"检测到日程「{i.name}」还有2小时就要到期了，但是现在是23点到7点之间，不发送提醒")
             else:
                 for j in config.groups:
                     logger.info(f"检测到日程「{i.name}」还有2小时就要到期了，发送提醒")
